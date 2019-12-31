@@ -29,7 +29,7 @@ void draw(Point point, char c = '#') {
   if (ch == 'o') {
     beep();
     grow = true;
-    food();
+    // food();
   } else if (ch != ' ' ) {
     beep();
     flash();
@@ -126,6 +126,16 @@ int main() {
   point.second = ncols - 1;
   for (point.first = 1; point.first < nrows - 1; point.first++)
     draw(point, '%');
+  point.second = ncols / 3;
+  for (point.first = 1; point.first < nrows - 1; point.first++)
+    if (point.first < nrows / 2 - 3 || point.first > nrows / 2 + 3)
+      draw(point, '%');
+  point.second = 2 * ncols / 3;
+  for (point.first = 1; point.first < nrows - 1; point.first++) 
+    if (point.first < nrows / 2 - 3 || point.first > nrows / 2 + 3)
+      draw(point, '%');
+  
+
 
 
   
@@ -138,7 +148,7 @@ int main() {
     draw(snake.back());
   }
 
-  for (int i = 0; i < 500; i++) {
+  for (int i = 0; i < 100; i++) {
     food();
   }
   
