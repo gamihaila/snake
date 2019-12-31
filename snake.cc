@@ -1,6 +1,7 @@
 #include <curses.h> // required
 #include <time.h>
 #include <iostream>
+#include <fstream>
 #include <queue>
 
 using namespace std;
@@ -10,6 +11,10 @@ char d = 'm';
 chtype existing[300];
 bool grow = false;
 int sleepms = 100;
+int idx = 0;
+bool replay = false;
+
+string history = "";
 
 void food();
 
@@ -24,6 +29,20 @@ char read(Point point) {
   return existing[0];
 }
 
+void save(const string& history) {
+  string filename = "snake.hist";
+  FILE *f = fopen("snake.hist", "w");
+  fputs(history.c_str(), f);
+  fclose(f);
+}
+
+void load(const string& filename) {
+  ifstream file;
+  file.open(filename);
+  getline(file, history);
+  file.close();
+}
+
 void draw(Point point, char c = '#') {
   char ch = read(point);
   if (ch == 'o') {
@@ -35,12 +54,15 @@ void draw(Point point, char c = '#') {
     flash();
     cbreak();
     getch();
+    save(history);
     exit(1);
   }
   move(point.first, point.second);
   addch(c);
   move(point.first, point.second);
 }
+
+
 
 int msleep(long msec)
 {
@@ -66,7 +88,7 @@ int msleep(long msec)
 void get_pos(int *r, int *c) {
   msleep(sleepms);
   do {
-    int input = wgetch(wnd);
+    int input = replay ? history[idx++] : wgetch(wnd);
     if (input != ERR
         && ((d == 'q' && input != 'a') ||
             (d == 'a' && input != 'q') ||
@@ -74,6 +96,7 @@ void get_pos(int *r, int *c) {
             (d == 'n' && input != 'm'))) {
       d = input;
     }
+    history += d;
     switch(d) {
     case 'q': (*r)--; return; // move up
     case 'a': (*r)++; return; // move down
@@ -101,7 +124,7 @@ void food() {
   }
 }
 
-int main() {
+int main(int argc, char **argv) {
   int r, c, nrows, ncols;
   const int LEN = 20;
 
@@ -114,6 +137,12 @@ int main() {
   refresh();
   Point point;
 
+  if (argc > 1) {
+    replay = true;
+    idx = 0;
+    load("snake.hist");
+  }
+  
   point.first = 0;
   for (point.second = 0; point.second < ncols; point.second++)
     draw(point, '%');
