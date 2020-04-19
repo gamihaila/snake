@@ -5,7 +5,7 @@
 #include <queue>
 
 using namespace std;
-typedef pair<int, int> Point;
+//typedef pair<int, int> Point;
 WINDOW *wnd;
 char d = 'm';
 chtype existing[300];
@@ -15,6 +15,15 @@ int idx = 0;
 bool replay = false;
 
 string history = "";
+
+struct Point {
+  Point(int r = 0, int c = 0) {
+    first = r;
+    c = second;
+  }
+  int first, second;
+}; 
+
 
 void food();
 
@@ -113,16 +122,45 @@ void get_point(Point* point) {
 void food() {
   int nrows, ncols;
   getmaxyx(wnd,nrows,ncols);
-  Point point;
   while(true) {
-    point.first = rand() % nrows;
-    point.second = rand() % ncols;
+    Point point(rand() % nrows, rand() % ncols);
     if (read(point) == ' ') {
       draw(point, 'o');
       break;
     }
   }
 }
+
+void line(Point start, Point end) {
+  if (start.first == end.first) {
+    for (Point p(start.first, start.second); p.second < end.second; p.second++) {
+      move(p.first, p.second);
+      addch('%');
+      move(p.first, p.second);
+    }
+  }
+  if (start.second == end.second) {
+    for (Point p(start.first, start.second); p.first < end.first; p.first++) {
+      move(p.first, p.second);
+      addch('%');
+      move(p.first, p.second);
+    }
+  }
+}
+
+void oneRoom(int nrows, int ncols) {
+  line(Point(0, 0), Point(0, ncols));
+  line(Point(nrows, 0), Point(nrows, ncols));
+  line(Point(0, 0), Point(nrows, 0));
+  line(Point(0, ncols), Point(nrows, ncols));
+}
+
+void twoRooms(int nrows, int ncols) {
+  oneRoom(nrows, ncols);
+  line(Point(0, ncols/2), Point(nrows/2 - 3, ncols/2));
+  line(Point(nrows/2 + 3, ncols/2), Point(nrows, ncols/2));
+}
+
 
 int main(int argc, char **argv) {
   int r, c, nrows, ncols;
@@ -143,36 +181,13 @@ int main(int argc, char **argv) {
     load("snake.hist");
   }
   
-  point.first = 0;
-  for (point.second = 0; point.second < ncols; point.second++)
-    draw(point, '%');
-  point.first = nrows - 1;
-  for (point.second = 0; point.second < ncols; point.second++)
-    draw(point, '%');
-  point.second = 0;
-  for (point.first = 1; point.first < nrows - 1; point.first++)
-    draw(point, '%');
-  point.second = ncols - 1;
-  for (point.first = 1; point.first < nrows - 1; point.first++)
-    draw(point, '%');
-  point.second = ncols / 3;
-  for (point.first = 1; point.first < nrows - 1; point.first++)
-    if (point.first < nrows / 2 - 3 || point.first > nrows / 2 + 3)
-      draw(point, '%');
-  point.second = 2 * ncols / 3;
-  for (point.first = 1; point.first < nrows - 1; point.first++) 
-    if (point.first < nrows / 2 - 3 || point.first > nrows / 2 + 3)
-      draw(point, '%');
+  oneRoom(nrows, ncols);
   
-
-
-
-  
-  r = nrows/2; c = ncols/2;
+  r = nrows/2 - 2; c = ncols/2;
   queue<Point> snake;
 
   for (int i = 0; i < LEN; ++i) {
-    point = make_pair(r, c++);
+    Point point(r, c++);
     snake.push(point);
     draw(snake.back());
   }
