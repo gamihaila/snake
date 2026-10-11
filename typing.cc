@@ -44,9 +44,18 @@ char last_ch = ' ';
 void draw_key(int r, int c, char ch, int len, bool invert) {
   if (invert) attron(A_REVERSE);
   for (int i = 0; i < len; i++)
-    mvaddch(r, c + i, i == len / 2 && len < BARLEN ? ch : ' ');
+    mvaddch(r, c + i, i == len / 2 ? ch : ' ');
   if (invert) attroff(A_REVERSE);
-  if (len >= BARLEN) mvaddch(r, c + len / 2, ' '); // the bar is all spaces
+}
+
+void draw_bar(bool invert) {
+  const char *label = "SPACE";
+  if (invert) attron(A_REVERSE);
+  for (int j = 0; j < BARLEN; j++) {
+    int at = j - (BARLEN - 5) / 2;
+    mvaddch(BARTOP, BARLEFT + j, at >= 0 && at < 5 ? label[at] : ' ');
+  }
+  if (invert) attroff(A_REVERSE);
 }
 
 // find the screen position of the key for character ch
@@ -78,20 +87,27 @@ void draw_keyboard() {
   for (int i = 0; i < NKEYROWS; i++)
     for (int j = 0; keys[i][j]; j++)
       mvaddch(KEYTOP + 2 * i, 2 + 2 * i + KEYPITCH * j + 1, keys[i][j]);
-  for (int j = 0; j < BARLEN; j++)
-    mvaddch(BARTOP, BARLEFT + j, ' ');
+  draw_bar(false);
 }
 
-void press(char ch) {
-  if (last_r >= 0) // uninvert the previous key
-    draw_key(last_r, last_c, last_ch, last_len, false);
+void unhighlight() {
+  if (last_r < 0) return;
+  if (last_len >= BARLEN) draw_bar(false);
+  else draw_key(last_r, last_c, last_ch, last_len, false);
+  last_r = -1;
+}
+
+// the inverted key is the one for the NEXT letter to be typed:
+// the keyboard shows you where to go, not where you have been
+void highlight_next() {
+  unhighlight();
+  if (line_idx >= (int)lines.size()) return;
   int r, c, len;
   char shown;
-  if (find_key(ch, &r, &c, &len, &shown)) {
-    draw_key(r, c, shown, len, true);
+  if (find_key(lines[line_idx][pos], &r, &c, &len, &shown)) {
+    if (len >= BARLEN) draw_bar(true);
+    else draw_key(r, c, shown, len, true);
     last_r = r; last_c = c; last_len = len; last_ch = shown;
-  } else {
-    last_r = -1;
   }
 }
 
@@ -122,11 +138,13 @@ void draw_stats() {
 void draw_line() {
   string line = lines[line_idx];
   for (int j = 0; j < (int)line.size(); j++) {
-    if (j == pos) attron(A_UNDERLINE);
+    // the next letter is inverted, like its key; the hardware
+    // cursor is parked in a corner so it cannot hide the letter
+    if (j == pos) attron(A_REVERSE);
     mvaddch(TEXTTOP, 2 + j, line[j]);
-    if (j == pos) attroff(A_UNDERLINE);
+    if (j == pos) attroff(A_REVERSE);
   }
-  move(TEXTTOP, 2 + pos);
+  move(nrows - 1, ncols - 1);
 }
 
 void load(const string& filename) {
@@ -172,6 +190,7 @@ int main(int argc, char **argv) {
     mvaddch(14, c, '-');
   mvprintw(nrows - 1, 0, "ESC: quit");
   draw_stats();
+  highlight_next();
   draw_line();
   refresh();
 
@@ -181,13 +200,12 @@ int main(int argc, char **argv) {
     int ch = wgetch(wnd);
     if (ch == ERR) { // no key yet, just keep the clock honest
       draw_stats();
-      move(TEXTTOP, 2 + pos);
+      move(nrows - 1, ncols - 1); // keep the cursor parked
       refresh();
       continue;
     }
     if (ch == 27) break; // ESC
     if (!start) start = time(NULL);
-    press(ch);
     if (ch == lines[line_idx][pos]) {
       correct++;
       pos++;
@@ -203,6 +221,7 @@ int main(int argc, char **argv) {
       wrong++;
       beep();
     }
+    if (!done) highlight_next();
     draw_stats();
     if (!done) draw_line();
     refresh();
