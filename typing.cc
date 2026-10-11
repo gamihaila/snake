@@ -188,7 +188,6 @@ int main(int argc, char **argv) {
   draw_keyboard();
   for (int c = 0; c < ncols; c++)
     mvaddch(14, c, '-');
-  mvprintw(nrows - 1, 0, "ESC: quit");
   draw_stats();
   highlight_next();
   draw_line();
