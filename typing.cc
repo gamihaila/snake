@@ -131,7 +131,7 @@ void draw_stats() {
   mvprintw(0, 24, "Speed: %d wpm", wpm());
   long secs = elapsed();
   char buf[32];
-  sprintf(buf, "Time: %02ld:%02ld", secs / 60, secs % 60);
+  sprintf(buf, "Time: %02ld:%02ld", (long)(secs / 60), (long)(secs % 60));
   mvprintw(0, ncols - (int)strlen(buf), "%s", buf);
 }
 
@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
   clear();
   long secs = elapsed();
   mvprintw(nrows / 2 - 2, 4, "Finished: %s", argv[1]);
-  mvprintw(nrows / 2, 4, "Time: %02ld:%02ld", secs / 60, secs % 60);
+  mvprintw(nrows / 2, 4, "Time: %02ld:%02ld", (long)(secs / 60), (long)(secs % 60));
   mvprintw(nrows / 2 + 1, 4, "Accuracy: %.1f%%", accuracy());
   mvprintw(nrows / 2 + 2, 4, "Speed: %d wpm", wpm());
   mvprintw(nrows / 2 + 4, 4, "Press any key.");
