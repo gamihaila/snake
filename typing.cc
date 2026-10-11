@@ -138,11 +138,13 @@ void draw_stats() {
 void draw_line() {
   string line = lines[line_idx];
   for (int j = 0; j < (int)line.size(); j++) {
-    if (j == pos) attron(A_UNDERLINE);
+    // the next letter is inverted, like its key; the hardware
+    // cursor is parked in a corner so it cannot hide the letter
+    if (j == pos) attron(A_REVERSE);
     mvaddch(TEXTTOP, 2 + j, line[j]);
-    if (j == pos) attroff(A_UNDERLINE);
+    if (j == pos) attroff(A_REVERSE);
   }
-  move(TEXTTOP, 2 + pos);
+  move(nrows - 1, ncols - 1);
 }
 
 void load(const string& filename) {
@@ -198,7 +200,7 @@ int main(int argc, char **argv) {
     int ch = wgetch(wnd);
     if (ch == ERR) { // no key yet, just keep the clock honest
       draw_stats();
-      move(TEXTTOP, 2 + pos);
+      move(nrows - 1, ncols - 1); // keep the cursor parked
       refresh();
       continue;
     }
