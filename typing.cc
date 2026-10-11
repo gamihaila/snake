@@ -20,15 +20,28 @@ const char *keys[] = {
   "ZXCVBNM,./"
 };
 const int NKEYROWS = 4;
-const int KEYTOP = 3;   // screen row of the first keyboard row
 const int KEYPITCH = 4; // one key is " X ", plus a space between keys
 
-// the space bar
-const int BARTOP = 11;
+// screen layout, adjusted by layout() once the size is known:
+// the tall values suit a desktop terminal; on a short screen
+// (a phone with a large font) everything packs tighter
+int keytop = 3;   // screen row of the first keyboard row
+int keystep = 2;  // rows between keyboard rows
+int bartop = 11;  // screen row of the space bar
 const int BARLEFT = 24;
 const int BARLEN = 30;
+int septop = 14;  // screen row of the separator line
+int texttop = 17; // screen row of the practice line
 
-const int TEXTTOP = 17; // screen row of the practice line
+void layout() {
+  if (nrows < 20) {
+    keytop = 2;
+    keystep = 1;
+    bartop = 7;
+    septop = 9;
+    texttop = 11;
+  }
+}
 
 vector<string> lines;
 int line_idx = 0;
@@ -53,7 +66,7 @@ void draw_bar(bool invert) {
   if (invert) attron(A_REVERSE);
   for (int j = 0; j < BARLEN; j++) {
     int at = j - (BARLEN - 5) / 2;
-    mvaddch(BARTOP, BARLEFT + j, at >= 0 && at < 5 ? label[at] : ' ');
+    mvaddch(bartop, BARLEFT + j, at >= 0 && at < 5 ? label[at] : ' ');
   }
   if (invert) attroff(A_REVERSE);
 }
@@ -61,7 +74,7 @@ void draw_bar(bool invert) {
 // find the screen position of the key for character ch
 bool find_key(char ch, int *r, int *c, int *len, char *shown) {
   if (ch == ' ') {
-    *r = BARTOP; *c = BARLEFT; *len = BARLEN; *shown = ' ';
+    *r = bartop; *c = BARLEFT; *len = BARLEN; *shown = ' ';
     return true;
   }
   // shifted punctuation lives on the unshifted key
@@ -73,7 +86,7 @@ bool find_key(char ch, int *r, int *c, int *len, char *shown) {
   for (int i = 0; i < NKEYROWS; i++) {
     const char *q = strchr(keys[i], ch);
     if (q) {
-      *r = KEYTOP + 2 * i;
+      *r = keytop + keystep * i;
       *c = 2 + 2 * i + KEYPITCH * (int)(q - keys[i]);
       *len = 3;
       *shown = ch;
@@ -86,7 +99,7 @@ bool find_key(char ch, int *r, int *c, int *len, char *shown) {
 void draw_keyboard() {
   for (int i = 0; i < NKEYROWS; i++)
     for (int j = 0; keys[i][j]; j++)
-      mvaddch(KEYTOP + 2 * i, 2 + 2 * i + KEYPITCH * j + 1, keys[i][j]);
+      mvaddch(keytop + keystep * i, 2 + 2 * i + KEYPITCH * j + 1, keys[i][j]);
   draw_bar(false);
 }
 
@@ -141,7 +154,7 @@ void draw_line() {
     // the next letter is inverted, like its key; the hardware
     // cursor is parked in a corner so it cannot hide the letter
     if (j == pos) attron(A_REVERSE);
-    mvaddch(TEXTTOP, 2 + j, line[j]);
+    mvaddch(texttop, 2 + j, line[j]);
     if (j == pos) attroff(A_REVERSE);
   }
   move(nrows - 1, ncols - 1);
@@ -176,6 +189,7 @@ int main(int argc, char **argv) {
   cbreak();
   noecho();
   getmaxyx(wnd, nrows, ncols);
+  layout();
   clear();
 
   load(argv[1]);
@@ -187,7 +201,7 @@ int main(int argc, char **argv) {
 
   draw_keyboard();
   for (int c = 0; c < ncols; c++)
-    mvaddch(14, c, '-');
+    mvaddch(septop, c, '-');
   draw_stats();
   highlight_next();
   draw_line();
@@ -211,7 +225,7 @@ int main(int argc, char **argv) {
       if (pos >= (int)lines[line_idx].size()) {
         // line finished: clear it and bring up the next one
         for (int j = 0; j < (int)lines[line_idx].size(); j++)
-          mvaddch(TEXTTOP, 2 + j, ' ');
+          mvaddch(texttop, 2 + j, ' ');
         line_idx++;
         pos = 0;
         if (line_idx >= (int)lines.size()) done = true;
