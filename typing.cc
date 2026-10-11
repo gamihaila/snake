@@ -43,6 +43,33 @@ void layout() {
   }
 }
 
+// the shift keys flank the bottom letter row; each is a wide
+// key labeled SHIFT, drawn like the space bar
+const int LSHIFTC = 0;
+const int RSHIFTC = 48;
+const int SHIFTLEN = 7;
+
+// symbols that share a key: unshifted, and shifted above it
+const char *unshifted = "`1234567890-=[]\\;',./";
+const char *shifted   = "~!@#$%^&*()_+{}|:\"<>?";
+
+// does typing ch require a shift key?
+bool needs_shift(char ch) {
+  return isupper((unsigned char)ch) || strchr(shifted, ch) != NULL;
+}
+
+// the symbol a key shows while shift is held
+char shift_glyph(char ch) {
+  const char *p = strchr(unshifted, ch);
+  return p ? shifted[p - unshifted] : ch;
+}
+
+// which hand types the key in row i at position j: 0 left, 1 right
+int key_hand(int i, int j) {
+  const int split[] = {5, 4, 4, 4}; // last left-hand key of each row
+  return j <= split[i] ? 0 : 1;
+}
+
 vector<string> lines;
 int line_idx = 0;
 int pos = 0;            // cursor position in the current line
@@ -53,6 +80,8 @@ time_t start = 0;       // time of the first keystroke
 // the currently inverted key, so it can be drawn plain again
 int last_r = -1, last_c = -1, last_len = 0;
 char last_ch = ' ';
+int last_shift = -1;    // the currently inverted shift key, if any
+bool shown_shift = false; // is the keyboard showing shifted symbols?
 
 void draw_key(int r, int c, char ch, int len, bool invert) {
   if (invert) attron(A_REVERSE);
@@ -71,15 +100,28 @@ void draw_bar(bool invert) {
   if (invert) attroff(A_REVERSE);
 }
 
+void draw_shift(int side, bool invert) {
+  const char *label = "SHIFT";
+  int top = keytop + keystep * 3;
+  int c = side ? RSHIFTC : LSHIFTC;
+  if (invert) attron(A_REVERSE);
+  for (int j = 0; j < SHIFTLEN; j++) {
+    int at = j - (SHIFTLEN - 5) / 2;
+    mvaddch(top, c + j, at >= 0 && at < 5 ? label[at] : ' ');
+  }
+  if (invert) attroff(A_REVERSE);
+}
+
 // find the screen position of the key for character ch
-bool find_key(char ch, int *r, int *c, int *len, char *shown) {
+bool find_key(char ch, int *r, int *c, int *len, char *shown,
+              int *side) {
+  *side = -1;
   if (ch == ' ') {
     *r = bartop; *c = BARLEFT; *len = BARLEN; *shown = ' ';
     return true;
   }
   // shifted punctuation lives on the unshifted key
-  const char *shifted   = "~!@#$%^&*()_+{}|:\"<>?";
-  const char *unshifted = "`1234567890-=[]\\;',./";
+  bool shift = needs_shift(ch);
   const char *p = strchr(shifted, ch);
   if (p) ch = unshifted[p - shifted];
   ch = toupper(ch);
@@ -90,24 +132,35 @@ bool find_key(char ch, int *r, int *c, int *len, char *shown) {
       *c = 2 + 2 * i + KEYPITCH * (int)(q - keys[i]);
       *len = 3;
       *shown = ch;
+      // a shifted character is typed with the opposite hand's shift
+      if (shift) *side = key_hand(i, (int)(q - keys[i])) ? 0 : 1;
       return true;
     }
   }
   return false;
 }
 
-void draw_keyboard() {
+void draw_keyboard(bool shifted_mode) {
   for (int i = 0; i < NKEYROWS; i++)
-    for (int j = 0; keys[i][j]; j++)
-      mvaddch(keytop + keystep * i, 2 + 2 * i + KEYPITCH * j + 1, keys[i][j]);
+    for (int j = 0; keys[i][j]; j++) {
+      char ch = keys[i][j];
+      mvaddch(keytop + keystep * i, 2 + 2 * i + KEYPITCH * j + 1,
+              shifted_mode ? shift_glyph(ch) : ch);
+    }
   draw_bar(false);
+  draw_shift(0, false);
+  draw_shift(1, false);
 }
 
 void unhighlight() {
   if (last_r < 0) return;
   if (last_len >= BARLEN) draw_bar(false);
-  else draw_key(last_r, last_c, last_ch, last_len, false);
+  else draw_key(last_r, last_c,
+                shown_shift ? shift_glyph(last_ch) : last_ch,
+                last_len, false);
+  if (last_shift >= 0) draw_shift(last_shift, false);
   last_r = -1;
+  last_shift = -1;
 }
 
 // the inverted key is the one for the NEXT letter to be typed:
@@ -115,12 +168,25 @@ void unhighlight() {
 void highlight_next() {
   unhighlight();
   if (line_idx >= (int)lines.size()) return;
-  int r, c, len;
+  char want = lines[line_idx][pos];
+  // while the next character needs shift, the keyboard shows the
+  // shifted symbols, as if the key were already held down
+  bool shift = needs_shift(want);
+  if (shift != shown_shift) {
+    shown_shift = shift;
+    draw_keyboard(shown_shift);
+  }
+  int r, c, len, side;
   char shown;
-  if (find_key(lines[line_idx][pos], &r, &c, &len, &shown)) {
+  if (find_key(want, &r, &c, &len, &shown, &side)) {
     if (len >= BARLEN) draw_bar(true);
-    else draw_key(r, c, shown, len, true);
+    else draw_key(r, c, shown_shift ? shift_glyph(shown) : shown,
+                  len, true);
     last_r = r; last_c = c; last_len = len; last_ch = shown;
+    if (side >= 0) {
+      draw_shift(side, true);
+      last_shift = side;
+    }
   }
 }
 
@@ -199,7 +265,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  draw_keyboard();
+  draw_keyboard(false);
   for (int c = 0; c < ncols; c++)
     mvaddch(septop, c, '-');
   draw_stats();
