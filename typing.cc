@@ -90,12 +90,22 @@ void draw_key(int r, int c, char ch, int len, bool invert) {
   if (invert) attroff(A_REVERSE);
 }
 
+// One curses quirk matters here: for a long run of identical
+// cells (a row of dashes, a stretch of spaces) curses sends a
+// REP escape - "repeat the last character N times" - instead of
+// the characters themselves. hterm, the terminal inside iSH,
+// ignores REP, so such runs lose all but their first cells: a
+// full-width separator shows up as two dashes. The loops that
+// draw runs therefore refresh after every cell, which keeps
+// each run from ever forming. It costs a few extra refreshes
+// and changes nothing on other terminals.
 void draw_bar(bool invert) {
   const char *label = "SPACE";
   if (invert) attron(A_REVERSE);
   for (int j = 0; j < BARLEN; j++) {
     int at = j - (BARLEN - 5) / 2;
     mvaddch(bartop, BARLEFT + j, at >= 0 && at < 5 ? label[at] : ' ');
+    refresh();
   }
   if (invert) attroff(A_REVERSE);
 }
@@ -266,8 +276,10 @@ int main(int argc, char **argv) {
   }
 
   draw_keyboard(false);
-  for (int c = 0; c < ncols; c++)
+  for (int c = 0; c < ncols; c++) {
     mvaddch(septop, c, '-');
+    refresh(); // per cell, so no REP run forms (see draw_bar)
+  }
   draw_stats();
   highlight_next();
   draw_line();
@@ -290,8 +302,10 @@ int main(int argc, char **argv) {
       pos++;
       if (pos >= (int)lines[line_idx].size()) {
         // line finished: clear it and bring up the next one
-        for (int j = 0; j < (int)lines[line_idx].size(); j++)
+        for (int j = 0; j < (int)lines[line_idx].size(); j++) {
           mvaddch(texttop, 2 + j, ' ');
+          refresh(); // per cell, so no REP run forms
+        }
         line_idx++;
         pos = 0;
         if (line_idx >= (int)lines.size()) done = true;
