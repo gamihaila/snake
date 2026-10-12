@@ -239,6 +239,8 @@ void draw_caps() {
 }
 
 void draw_stats() {
+  move(0, 0);
+  clrtoeol(); // a shorter value must not leave the old tail behind
   mvprintw(0, 0, "Accuracy: %.1f%%", accuracy());
   mvprintw(0, 24, "Speed: %d wpm", wpm());
   long secs = elapsed();
