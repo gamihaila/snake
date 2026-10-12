@@ -75,6 +75,8 @@ int line_idx = 0;
 int pos = 0;            // cursor position in the current line
 long correct = 0;
 long wrong = 0;
+int case_errors = 0;   // consecutive letters wrong only in case
+bool caps_shown = false;
 time_t start = 0;       // time of the first keystroke
 
 // the currently inverted key, so it can be drawn plain again
@@ -215,7 +217,30 @@ double accuracy() {
   return total ? 100.0 * correct / total : 100.0;
 }
 
+// Caps lock cannot be asked about - a terminal program only
+// sees the characters it receives. But it can be inferred: a
+// typist who keeps producing the right letter in the wrong
+// case almost certainly has caps lock on. After CAPS_AFTER
+// such errors in a row, say so on the empty line under the
+// stats, until an exactly right keystroke clears the suspicion.
+const int CAPS_AFTER = 3;
+
+void draw_caps() {
+  bool show = case_errors >= CAPS_AFTER;
+  if (show == caps_shown) return;
+  caps_shown = show;
+  if (show) {
+    attron(A_REVERSE);
+    mvprintw(1, 0, " CAPS LOCK ");
+    attroff(A_REVERSE);
+  } else {
+    mvprintw(1, 0, "           ");
+  }
+}
+
 void draw_stats() {
+  move(0, 0);
+  clrtoeol(); // a shorter value must not leave the old tail behind
   mvprintw(0, 0, "Accuracy: %.1f%%", accuracy());
   mvprintw(0, 24, "Speed: %d wpm", wpm());
   long secs = elapsed();
@@ -299,6 +324,7 @@ int main(int argc, char **argv) {
     if (!start) start = time(NULL);
     if (ch == lines[line_idx][pos]) {
       correct++;
+      case_errors = 0;
       pos++;
       if (pos >= (int)lines[line_idx].size()) {
         // line finished: clear it and bring up the next one
@@ -312,10 +338,20 @@ int main(int argc, char **argv) {
       }
     } else {
       wrong++;
+      // a letter that is wrong only in case points at caps lock
+      char target = lines[line_idx][pos];
+      if (isalpha((unsigned char)ch) &&
+          isalpha((unsigned char)target) &&
+          tolower((unsigned char)ch) ==
+              tolower((unsigned char)target))
+        case_errors++;
+      else
+        case_errors = 0;
       beep();
     }
     if (!done) highlight_next();
     draw_stats();
+    draw_caps();
     if (!done) draw_line();
     refresh();
   }
