@@ -246,7 +246,8 @@ void draw_stats() {
   mvprintw(0, 24, "Speed: %d wpm", wpm());
   long secs = elapsed();
   char buf[32];
-  sprintf(buf, "Time: %02ld:%02ld", (long)(secs / 60), (long)(secs % 60));
+  snprintf(buf, sizeof(buf), "Time: %02ld:%02ld", (long)(secs / 60),
+           (long)(secs % 60));
   mvprintw(0, ncols - (int)strlen(buf), "%s", buf);
 }
 
