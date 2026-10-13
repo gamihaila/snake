@@ -77,6 +77,7 @@ long correct = 0;
 long wrong = 0;
 int case_errors = 0;   // consecutive letters wrong only in case
 bool caps_shown = false;
+bool hide_cursor = true; // whether the terminal lets us hide its cursor
 time_t start = 0;       // time of the first keystroke
 
 // the currently inverted key, so it can be drawn plain again
@@ -253,12 +254,12 @@ void draw_line() {
   string line = lines[line_idx];
   for (int j = 0; j < (int)line.size(); j++) {
     // the next letter is inverted, like its key; the hardware
-    // cursor is parked in a corner so it cannot hide the letter
+    // cursor is hidden so it cannot hide the letter
     if (j == pos) attron(A_REVERSE);
     mvaddch(texttop, 2 + j, line[j]);
     if (j == pos) attroff(A_REVERSE);
   }
-  move(nrows - 1, ncols - 1);
+  if (!hide_cursor) move(nrows - 1, ncols - 1);
 }
 
 void load(const string& filename) {
@@ -289,6 +290,9 @@ int main(int argc, char **argv) {
   wnd = initscr();
   cbreak();
   noecho();
+  hide_cursor = curs_set(0) != ERR; // an invisible cursor cannot
+  // cover the current letter; if the terminal refuses to hide it,
+  // fall back to parking it in a corner
   getmaxyx(wnd, nrows, ncols);
   layout();
   clear();
@@ -316,7 +320,7 @@ int main(int argc, char **argv) {
     int ch = wgetch(wnd);
     if (ch == ERR) { // no key yet, just keep the clock honest
       draw_stats();
-      move(nrows - 1, ncols - 1); // keep the cursor parked
+      if (!hide_cursor) move(nrows - 1, ncols - 1); // keep it parked
       refresh();
       continue;
     }
